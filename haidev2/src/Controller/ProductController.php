@@ -8,6 +8,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\Response;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\Product;
+use App\Entity\Category;
 use App\Repository\ProductRepository;
 use Symfony\Component\HttpFoundation\Request;
 use RuntimeException;
@@ -15,33 +16,42 @@ use Symfony\Component\Serializer\SerializerInterface;
 
 
 class ProductController extends AbstractController
-{
+{   
+    //dependency injection
     public function __construct(private readonly EntityManagerInterface $em,
                                 private readonly ProductRepository $productRepository) {
         
     }
+
+    //----CREATE----
     #[Route('/products', name: 'app_conference_test1', methods: 'POST')]
     public function addProduct(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-        if (!$data || !isset($data['name']) || !isset($data['price'])) {
+        if (!$data || !isset($data['name']) || !isset($data['price']) || !isset($data['category'])) {
             return new JsonResponse(['error' => 'Invalid JSON'], JsonResponse::HTTP_BAD_REQUEST);
         }
+
+        $category = new Category();
+        $category->setName($data['category']);
 
         $product = new Product();
         $product->setName($data['name']);
         $product->setPrice($data['price']);
+        $product->setCategory($category);
         $this->em->persist($product);
+        $this->em->persist($category);
         $this->em->flush();
 
         return new JsonResponse([
-        'status' => 200,
         'name' => $product->getName(),
-        'price' => $product->getPrice()]);
+        'price' => $product->getPrice()], JsonResponse::HTTP_CREATED);
     }
-        #[Route('/products', name: 'app_conference_test_penis', methods: 'GET')]
-    public function getAllProducts(Request $request, SerializerInterface $serializer): JsonResponse
-    {
+    //----READ----
+    #[Route('/products', name: 'app_conference_test_r', methods: 'GET')]
+    public function getAllProducts(Request $request): JsonResponse
+    {   
+        //price prin query builders!! in product repository
         $name = $request->query->get('name');
         if ($name) {
             $entries = $this->productRepository->findBy(['name'=> $name]);
@@ -50,6 +60,7 @@ class ProductController extends AbstractController
         }
         
         $arr = [];
+        //replace with serializer
         foreach ($entries as $entry) {
             $arr[] = [
                 'id' => $entry->getId(),
@@ -67,15 +78,32 @@ class ProductController extends AbstractController
          'data' => $arr
         ]);
     }
-    #[Route('/products/{id}', name: 'app_conference_test2', methods: 'DELETE')]
-    public function deleteItem(int $id): JsonResponse
+
+    #[Route('/products/{entry}', name: 'app_conference_test_rfdsfsdf', methods: 'GET')]
+    public function getOneProduct(Product $entry): JsonResponse
     {
-        $entry = $this->productRepository->find($id);
+        if(!$entry){
+            return new JsonResponse(['error' => 'Product not found'], JsonResponse::HTTP_NOT_FOUND);
+        }
+        return new JsonResponse([
+         'data' => [
+            'id' => $entry->getId(),
+            'name' => $entry->getName(),
+            'price' => $entry->getPrice()
+        ]
+        ]);
+    }
+
+
+    //----DELETE----
+    #[Route('/products/{entry}', name: 'app_conference_test223423', methods: 'DELETE')]
+    public function deleteItem(Product $entry): JsonResponse
+    {
+        //$entry = $this->productRepository->find($id);
 
         if (!$entry) {
             return new JsonResponse(['error' => 'No product found'], JsonResponse::HTTP_NOT_FOUND);
         }
-
         $this->em->remove($entry);
         $this->em->flush();
 
@@ -83,26 +111,30 @@ class ProductController extends AbstractController
             'message' => 'Product deleted succesfully'
         ]);
     }
-       #[Route('/products/{id}', name: 'app_conference_test2', methods: 'POST')]
-    public function modifyItem(int $id, Request $request): JsonResponse
+    //----UPDATE----
+    #[Route('/products/{entry}', name: 'app_conference_test2998', methods: 'POST')]
+    public function modifyItem(Product $entry, Request $request): JsonResponse
     {
-        //cautam entry-ul cu id-ul din url
-        $entry = $this->productRepository->find($id);      
+        //cautam entry-ul cu id-ul din url    
         if (!$entry) {
             return new JsonResponse(['error' => 'No product found'], JsonResponse::HTTP_NOT_FOUND);
         }
 
         //prelucrare json de intrare
         $data = json_decode($request->getContent(), true);
-        if (!$data || !isset($data['name']) || !isset($data['price'])) {
+        if (!$data) {
             return new JsonResponse(['error' => 'Invalid JSON'], JsonResponse::HTTP_BAD_REQUEST);
         }
 
         //inlocuire date din bd pentru json cu id-ul din url
-        $entry->setName($data['name']);
-        $entry->setPrice($data['price']);
-        
-        //$this->em->remove($entry);
+        if(isset($data['name'])) {
+            $entry->setName($data['name']);
+        }
+        if(isset($data['price'])) {
+            $entry->setPrice($data['price']);
+        }
+       
+        $this->em->persist($entry);
         $this->em->flush();
 
         return new JsonResponse([

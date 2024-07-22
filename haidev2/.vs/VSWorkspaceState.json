@@ -2,13 +2,12 @@
   "ExpandedNodes": [
     "",
     "\\bin",
-    "\\config\\packages",
     "\\migrations",
     "\\src",
     "\\src\\Controller",
     "\\src\\Entity",
     "\\src\\Repository"
   ],
-  "SelectedNode": "\\migrations\\Version20240710082401.php",
+  "SelectedNode": "\\src\\Controller\\ProductController.php",
   "PreviewInSolutionExplorer": false
 }
