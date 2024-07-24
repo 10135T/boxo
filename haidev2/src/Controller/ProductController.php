@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\DTO\ProductDTO;
+use App\Repository\CategoryRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -9,94 +11,114 @@ use Symfony\Component\HttpFoundation\Response;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\Product;
 use App\Entity\Category;
+use App\DTO\CategoryDTO;
 use App\Repository\ProductRepository;
 use Symfony\Component\HttpFoundation\Request;
 use RuntimeException;
 use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 
 class ProductController extends AbstractController
 {   
     //dependency injection
-    public function __construct(private readonly EntityManagerInterface $em,
-                                private readonly ProductRepository $productRepository) {
-        
+    public function __construct(EntityManagerInterface $em, ProductRepository $productRepository,CategoryRepository $categoryRepository, SerializerInterface $serializer, ValidatorInterface $validator)
+    {
+        $this->em = $em;
+        $this->productRepository = $productRepository;
+        $this->categoryRepository = $categoryRepository;
+        $this->serializer = $serializer;
+        $this->validator = $validator;
     }
 
-    //----CREATE----
-    #[Route('/products', name: 'app_conference_test1', methods: 'POST')]
+//----CREATE----
+    #[Route('/products', name: 'create_product', methods: 'POST')]
     public function addProduct(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
+
         if (!$data || !isset($data['name']) || !isset($data['price']) || !isset($data['category'])) {
             return new JsonResponse(['error' => 'Invalid JSON'], JsonResponse::HTTP_BAD_REQUEST);
         }
+        $category = $this->categoryRepository->findOneBy(['name' => $data['category']]);
 
-        $category = new Category();
-        $category->setName($data['category']);
+        if (!$category) {
+            return new JsonResponse(['error' => 'The category does not exist!'], JsonResponse::HTTP_BAD_REQUEST);
+        }
 
         $product = new Product();
         $product->setName($data['name']);
         $product->setPrice($data['price']);
         $product->setCategory($category);
+
         $this->em->persist($product);
-        $this->em->persist($category);
         $this->em->flush();
 
-        return new JsonResponse([
-        'name' => $product->getName(),
-        'price' => $product->getPrice()], JsonResponse::HTTP_CREATED);
+        $categoryDTO = $category ? new CategoryDTO($category->getId(), $category->getName()) : null;
+
+        $productDTO = new ProductDTO(
+            $product->getId(),
+            $product->getName(),
+            $product->getPrice(),
+            $categoryDTO
+        );
+
+        return new JsonResponse($productDTO->jsonConverter());
     }
-    //----READ----
-    #[Route('/products', name: 'app_conference_test_r', methods: 'GET')]
+
+    //----READ ALL----
+    #[Route('/products', name: 'read_all_products', methods: 'GET')]
     public function getAllProducts(Request $request): JsonResponse
-    {   
-        //price prin query builders!! in product repository
+    {
         $name = $request->query->get('name');
         if ($name) {
             $entries = $this->productRepository->findBy(['name'=> $name]);
         } else {
             $entries = $this->productRepository->findAll();
         }
-        
-        $arr = [];
-        //replace with serializer
-        foreach ($entries as $entry) {
-            $arr[] = [
-                'id' => $entry->getId(),
-                'name' => $entry->getName(),
-                'price' => $entry->getPrice()
-            ];
-        }
-        $jsonData = json_encode($arr);
 
-        if($jsonData === false){
-            throw new \RuntimeException('Failed JSON encoding');
+        $arr = [];
+        //pentru dto nu avem nevoie de serializer
+        foreach ($entries as $entry) {
+            $category = $entry->getCategory();
+            $categoryDTO = $category ? new CategoryDTO($category->getId(), $category->getName()) : null;
+            $productDTO = new ProductDTO(
+                $entry->getId(),
+                $entry->getName(),
+                $entry->getPrice(),
+                $categoryDTO,
+            );
+            $arr[] = $productDTO->jsonConverter();
         }
 
         return new JsonResponse([
-         'data' => $arr
+            'data' => $arr
         ]);
     }
 
-    #[Route('/products/{entry}', name: 'app_conference_test_rfdsfsdf', methods: 'GET')]
+    //--READ ONE--
+    #[Route('/products/{entry}', name: 'read_one_product', methods: 'GET')]
     public function getOneProduct(Product $entry): JsonResponse
     {
         if(!$entry){
             return new JsonResponse(['error' => 'Product not found'], JsonResponse::HTTP_NOT_FOUND);
         }
-        return new JsonResponse([
-         'data' => [
-            'id' => $entry->getId(),
-            'name' => $entry->getName(),
-            'price' => $entry->getPrice()
-        ]
-        ]);
+        $categoryDTO = $entry->getCategory() ? new CategoryDTO($entry->getCategory()->getId(), $entry->getCategory()->getName()) : null;
+
+
+        $productDTO = new ProductDTO(
+            $entry->getId(),
+            $entry->getName(),
+            $entry->getPrice(),
+            $categoryDTO,
+        );
+
+        return new JsonResponse($productDTO->jsonConverter());
     }
 
 
     //----DELETE----
-    #[Route('/products/{entry}', name: 'app_conference_test223423', methods: 'DELETE')]
+    #[Route('/products/{entry}', name: 'delete_product', methods: 'DELETE')]
     public function deleteItem(Product $entry): JsonResponse
     {
         //$entry = $this->productRepository->find($id);
@@ -112,7 +134,7 @@ class ProductController extends AbstractController
         ]);
     }
     //----UPDATE----
-    #[Route('/products/{entry}', name: 'app_conference_test2998', methods: 'POST')]
+    #[Route('/products/{entry}', name: 'update_product', methods: 'POST')]
     public function modifyItem(Product $entry, Request $request): JsonResponse
     {
         //cautam entry-ul cu id-ul din url    

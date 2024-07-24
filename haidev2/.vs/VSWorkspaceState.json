@@ -2,12 +2,14 @@
   "ExpandedNodes": [
     "",
     "\\bin",
+    "\\config",
     "\\migrations",
     "\\src",
     "\\src\\Controller",
+    "\\src\\DTO",
     "\\src\\Entity",
     "\\src\\Repository"
   ],
-  "SelectedNode": "\\src\\Controller\\ProductController.php",
+  "SelectedNode": "\\src\\DTO\\CategoryDTO.php",
   "PreviewInSolutionExplorer": false
 }
