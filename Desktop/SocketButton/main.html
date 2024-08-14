@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>WebSocket Color Sync</title>
+</head>
+<body class="body">
+<button class="button" onclick="changeColor();">Click to Change Color!</button>
+
+
+<div class="container">
+    <div class="top" id="container_1_top" onclick="makeMove(this.id, 'container_1');"></div>
+    <div class="bottom" id="container_1_bottom" onclick="makeMove(this.id, 'container_1');"></div>
+    <div class="left" id="container_1_left" onclick="makeMove(this.id, 'container_1');"></div>
+    <div class="right" id="container_1_right" onclick="makeMove(this.id, 'container_1');"></div>
+    <div class="center" id="container_1_center"></div>
+</div>
+<script>
+    let color_index = 0;
+    let color_selected_edge = "black";
+    let clientId = null; // Variabilă pentru ID-ul clientului
+    let score_color = "blue"; // Culoarea scorului, poate fi 'blue' sau 'red'
+    let ws = new WebSocket('ws://localhost:8081');
+
+    ws.onopen = function() {
+        console.log('Connected to WebSocket server');
+    };
+
+    ws.onmessage = function(event) {
+        console.log(event);
+        const data = JSON.parse(event.data);
+
+        if (data.message === 'Error' && data.error === 'Room is full') {
+            // Redirecționează utilizatorul la pagina de eroare
+            window.location.href = data.redirect;
+        } else {
+
+            if(data.score_color){
+                document.getElementById(data.center_id).style.backgroundColor = data.score_color;
+            }
+            if (data.message === 'Connected') {
+                // Salvează ID-ul clientului și setează culoarea scorului
+                clientId = data.clientId;
+                console.log('Connected with ID:', clientId);
+
+                // Setați culoarea scorului în funcție de ID-ul clientului
+                if (clientId === 1)
+                    score_color = "red";
+                else
+                    score_color = "cyan";
+                console.log('Score color set to:', score_color);
+            }
+            if (data.color) {
+                document.body.style.backgroundColor = data.color;
+                color_index = data.color_index;
+                console.log('Changing color to:', data.color);
+            }
+            if(data.border) {
+                addBorder(data.border, false);
+            }
+        }
+    };
+
+    ws.onclose = function() {
+        console.log('Disconnected from WebSocket server');
+    };
+    function makeMove(elementId, container_id){
+        addBorder(elementId);
+        validateContainer(elementId);
+    }
+
+    function validateContainer(elementId) {
+        // Obține elementul container
+        console.log(elementId);
+        const element = document.getElementById(elementId);
+        let container = element.parentNode;
+        if (!container) {
+            console.error("Container with ID '" + container_id + "' not found.");
+            return;
+        }
+
+        // Obține elementele "top", "left", "right" și "bottom" din container
+        const topElement = container.querySelector(".top");
+        const leftElement = container.querySelector(".left");
+        const rightElement = container.querySelector(".right");
+        const bottomElement = container.querySelector(".bottom");
+        const centerElement = container.querySelector(".center");
+
+        if (!topElement || !leftElement || !rightElement || !bottomElement || !centerElement) {
+            console.error("One or more elements not found within the container.");
+            return;
+        }
+
+        // Obține culoarea de fundal calculată a fiecărui element
+        const topBackgroundColor = window.getComputedStyle(topElement).backgroundColor;
+        const leftBackgroundColor = window.getComputedStyle(leftElement).backgroundColor;
+        const rightBackgroundColor = window.getComputedStyle(rightElement).backgroundColor;
+        const bottomBackgroundColor = window.getComputedStyle(bottomElement).backgroundColor;
+
+        // Verifică dacă toate culorile sunt negre
+        const isAllBlack =
+            topBackgroundColor === "rgb(0, 0, 0)" &&
+            leftBackgroundColor === "rgb(0, 0, 0)" &&
+            rightBackgroundColor === "rgb(0, 0, 0)" &&
+            bottomBackgroundColor === "rgb(0, 0, 0)";
+
+        // Schimbă culoarea de fundal a elementului "center" dacă toate culorile sunt negre
+        if (isAllBlack) {
+
+            centerElement.style.backgroundColor = score_color;
+            ws.send(JSON.stringify({score_color : score_color, center_id: "center"}));
+        } else {
+            console.log("Not all elements are black yet.");
+        }
+    }
+
+    function addBorder(elementId, sendToServer = true) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.style.backgroundColor = color_selected_edge;
+            if(sendToServer)
+                ws.send(JSON.stringify({border : elementId}));
+        } else {
+            console.error('Element with ID ' + elementId + ' not found.');
+        }
+    }
+
+    function changeColor(){
+        let newColor;
+        if(color_index === 1) {
+            newColor = "red";
+            color_index = 0;
+        } else {
+            newColor = "green";
+            color_index = 1;
+        }
+        console.log(newColor, color_index);
+
+        console.log('Changing color locally to:', newColor); // Afișează culoarea care urmează să fie trimisă
+        document.body.style.backgroundColor = newColor;
+        ws.send(JSON.stringify({ color: newColor, color_index: color_index }));
+    }
+</script>
+</body>
+</html>
