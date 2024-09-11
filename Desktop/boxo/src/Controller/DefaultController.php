@@ -112,7 +112,7 @@ class DefaultController extends AbstractController
             'player_count' => count($rooms[$uuid]),
         ]);
     }
-
+    //asdad
     #[Route('/leave/{uuid}', name: 'app_leave_room', methods: ['GET'])]
     public function leaveRoom(string $uuid, Request $request): JsonResponse
     {
