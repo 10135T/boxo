@@ -1,0 +1,30 @@
+{# templates/play.html.twig #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe</title>
+    <link rel="stylesheet" href="/css/game.css">
+</head>
+<body>
+    <h1>Welcome to the Tic-Tac-Toe game!</h1>
+    <div id="game-board">
+        <!-- Include your game layout here, e.g., the Tic-Tac-Toe grid -->
+        <button id="action-btn">Click me</button>
+    </div>
+
+    <script>
+        // Add your JavaScript game logic here
+        let isBlue = true;
+        document.getElementById("action-btn").addEventListener("click", function() {
+            if (isBlue) {
+                document.body.style.backgroundColor = "blue";
+            } else {
+                document.body.style.backgroundColor = "red";
+            }
+            isBlue = !isBlue;
+        });
+    </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use App\Entity\Games;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\HttpFoundation\Response;
 
 class DefaultController extends AbstractController
 {
@@ -71,11 +72,11 @@ class DefaultController extends AbstractController
     }
 
     #[Route('/play/{uuid}', name: 'app_connect_room', methods: ['GET'])]
-    public function connectToRoom(string $uuid, Request $request): JsonResponse
+    public function connectToRoom(string $uuid, Request $request): Response
     {
         // Obținem sesiunea curentă
         $session = $request->getSession();
-        
+    
         // Verificăm dacă există deja un UUID pentru jucător în sesiune
         $playerToken = $session->get('player_token');
     
@@ -104,32 +105,29 @@ class DefaultController extends AbstractController
         }
     
         // Verificăm dacă playerToken-ul este deja în cameră
-        if (in_array($playerToken, $rooms[$uuid])) {
-            return $this->json([
-                'message' => 'You are already in the room ' . $uuid,
-                'player_count' => $game->getPlayerCount(),
-            ]);
+        if (!in_array($playerToken, $rooms[$uuid])) {
+            // Verificăm dacă camera este plină (max 2 jucători)
+            if ($game->getPlayerCount() >= 2) {
+                return $this->json([
+                    'message' => 'Room is full',
+                ], JsonResponse::HTTP_BAD_REQUEST);
+            }
+    
+            // Adăugăm token-ul jucătorului în cameră
+            $rooms[$uuid][] = $playerToken;
+            $session->set('rooms', $rooms);
+    
+            // Incrementăm numărul de jucători în baza de date
+            $game->setPlayerCount($game->getPlayerCount() + 1);
+            $this->em->persist($game);
+            $this->em->flush();
         }
     
-        // Verificăm dacă camera este plină (max 2 jucători)
-        if ($game->getPlayerCount() >= 2) {
-            return $this->json([
-                'message' => 'Room is full',
-            ], JsonResponse::HTTP_BAD_REQUEST);
-        }
-    
-        // Adăugăm token-ul jucătorului în cameră
-        $rooms[$uuid][] = $playerToken;
-        $session->set('rooms', $rooms);
-    
-        // Incrementăm numărul de jucători în baza de date
-        $game->setPlayerCount($game->getPlayerCount() + 1);
-        $this->em->persist($game);
-        $this->em->flush();
-    
-        return $this->json([
-            'message' => 'You are in the room ' . $uuid,
+        // Redirecționăm către template-ul Twig cu jocul
+        return $this->render('play.html.twig', [
+            'game_uuid' => $uuid,
             'player_count' => $game->getPlayerCount(),
+            'player_token' => $playerToken
         ]);
     }
     
